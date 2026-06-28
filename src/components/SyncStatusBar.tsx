@@ -1,21 +1,19 @@
 import { View, Text, StyleSheet } from 'react-native'
 import { usePeerStore } from '../stores/peerStore'
+import { useThemeColors, spacing, borderRadius, typography } from '../theme'
 
 export default function SyncStatusBar() {
   const connectedPeers = usePeerStore(s => s.connectedPeers)
+  const colors = useThemeColors()
+  const isConnected = connectedPeers.length > 0
 
   return (
-    <View style={styles.container}>
-      <View
-        style={[
-          styles.dot,
-          { backgroundColor: connectedPeers.length > 0 ? '#34C759' : '#FF9500' },
-        ]}
-      />
-      <Text style={styles.text}>
-        {connectedPeers.length > 0
-          ? `${connectedPeers.length} peer${connectedPeers.length > 1 ? 's' : ''} connected`
-          : 'Offline — data saved locally'}
+    <View style={[styles.container, { backgroundColor: isConnected ? colors.successLight : colors.warningLight }]}>
+      <View style={[styles.dot, { backgroundColor: isConnected ? colors.success : colors.warning }]} />
+      <Text style={[styles.text, { color: isConnected ? colors.success : colors.warning }]}>
+        {isConnected
+          ? `\u25CF ${connectedPeers.length} peer${connectedPeers.length > 1 ? 's' : ''} connected`
+          : '\u25CF Offline \u2014 data saved locally'}
       </Text>
     </View>
   )
@@ -26,14 +24,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    backgroundColor: '#f8f8f8',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
+    width: 6,
+    height: 6,
+    borderRadius: borderRadius.full,
+    marginRight: spacing.sm,
   },
-  text: { fontSize: 12, color: '#666' },
+  text: {
+    ...typography.footnote,
+    fontWeight: '600',
+  },
 })

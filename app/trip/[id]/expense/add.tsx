@@ -16,14 +16,26 @@ import { useTripStore } from '../../../../src/stores/tripStore'
 import { usePeerStore } from '../../../../src/stores/peerStore'
 import SplitSelector from '../../../../src/components/SplitSelector'
 import { SplitType, SplitDetail } from '../../../../src/types'
-import { validateSplit } from '../../../../src/utils/split'
+import { validateSplit, calculateSplit } from '../../../../src/utils/split'
+import { useThemeColors, spacing, borderRadius, typography, getCurrencySymbol, formatCurrency } from '../../../../src/theme'
 
 const CATEGORIES = ['Food', 'Transport', 'Accommodation', 'Activities', 'Shopping', 'Drinks', 'Other']
+
+const CATEGORY_ICONS: Record<string, string> = {
+  Food: '\uD83C\uDF54',
+  Transport: '\uD83D\uDE8E',
+  Accommodation: '\uD83C\uDFE8',
+  Activities: '\u26BD',
+  Shopping: '\uD83D\uDED2',
+  Drinks: '\uD83C\uDF7A',
+  Other: '\uD83D\uDCCB',
+}
 
 export default function AddExpenseScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const insets = useSafeAreaInsets()
+  const colors = useThemeColors()
 
   const trip = useTripStore(s => s.trips.find(t => t.id === id))
   const { participantsByTrip, addExpense } = useExpenseStore()
@@ -48,6 +60,11 @@ export default function AddExpenseScreen() {
   }, [participants.length])
 
   const numAmount = parseFloat(amount) || 0
+
+  const computedSplit = useMemo(() => {
+    if (numAmount <= 0 || splitAmong.length === 0) return []
+    return calculateSplit(numAmount, splitType, splitAmong, splitDetails)
+  }, [numAmount, splitType, splitAmong, splitDetails])
 
   const handleSubmit = () => {
     setError(null)
@@ -77,66 +94,93 @@ export default function AddExpenseScreen() {
     router.back()
   }
 
+  const canSave = description.trim().length > 0 && paidBy.length > 0 && numAmount > 0
+
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
+      style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: colors.divider, backgroundColor: colors.navBar }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.cancel}>Cancel</Text>
+          <Text style={[styles.cancel, { color: colors.accent }]}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Add Expense</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Add Expense</Text>
         <TouchableOpacity onPress={handleSubmit}>
-          <Text style={[styles.save, !description || !paidBy || numAmount <= 0 ? styles.saveDisabled : null]}>
+          <Text style={[styles.save, { color: canSave ? colors.accent : colors.textTertiary }]}>
             Save
           </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
-        <TextInput
-          style={styles.descriptionInput}
-          placeholder="What was it for?"
-          value={description}
-          onChangeText={setDescription}
-        />
-
-        <View style={styles.amountRow}>
-          <Text style={styles.currencySign}>{trip?.currency || '$'}</Text>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.amountSection}>
+          <Text style={[styles.currencySign, { color: colors.textSecondary }]}>
+            {getCurrencySymbol(trip?.currency || 'USD')}
+          </Text>
           <TextInput
-            style={styles.amountInput}
+            style={[styles.amountInput, { color: colors.text }]}
             placeholder="0.00"
+            placeholderTextColor={colors.textTertiary}
             keyboardType="decimal-pad"
             value={amount}
             onChangeText={setAmount}
           />
         </View>
 
-        <Text style={styles.label}>Paid by</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.payerRow}>
+        <TextInput
+          style={[styles.descriptionInput, { color: colors.text, borderBottomColor: colors.divider }]}
+          placeholder="What was the expense for?"
+          placeholderTextColor={colors.textTertiary}
+          value={description}
+          onChangeText={setDescription}
+        />
+
+        <Text style={[styles.label, { color: colors.textSecondary }]}>Paid by</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
           {participants.map(p => (
             <TouchableOpacity
               key={p.id}
-              style={[styles.payerBtn, paidBy === p.id && styles.payerActive]}
+              style={[
+                styles.chip,
+                { backgroundColor: colors.bgTertiary },
+                paidBy === p.id && { backgroundColor: colors.accent },
+              ]}
               onPress={() => setPaidBy(p.id)}
             >
-              <Text style={[styles.payerText, paidBy === p.id && styles.payerTextActive]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  { color: colors.textMuted },
+                  paidBy === p.id && { color: '#fff' },
+                ]}
+              >
                 {p.name}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        <Text style={styles.label}>Category</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryRow}>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>Category</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
           {CATEGORIES.map(c => (
             <TouchableOpacity
               key={c}
-              style={[styles.categoryBtn, category === c && styles.categoryActive]}
+              style={[
+                styles.chip,
+                { backgroundColor: colors.bgTertiary },
+                category === c && { backgroundColor: colors.accentLight },
+              ]}
               onPress={() => setCategory(c === category ? '' : c)}
             >
-              <Text style={[styles.categoryText, category === c && styles.categoryTextActive]}>
+              <Text style={styles.chipIcon}>{CATEGORY_ICONS[c]}</Text>
+              <Text
+                style={[
+                  styles.chipText,
+                  { color: colors.textMuted },
+                  category === c && { color: colors.accent, fontWeight: '600' },
+                ]}
+              >
                 {c}
               </Text>
             </TouchableOpacity>
@@ -152,76 +196,130 @@ export default function AddExpenseScreen() {
           onSplitAmongChange={setSplitAmong}
           onSplitDetailsChange={setSplitDetails}
           error={error}
+          currency={trip?.currency}
         />
 
-        {error && <Text style={styles.error}>{error}</Text>}
+        {error && !splitAmong.length && (
+          <View style={[styles.errorBox, { backgroundColor: colors.errorLight }]}>
+            <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+          </View>
+        )}
+
+        {computedSplit.length > 0 && splitType === 'equal' && (
+          <View style={[styles.previewBox, { backgroundColor: colors.bgSecondary }]}>
+            <Text style={[styles.previewTitle, { color: colors.textSecondary }]}>Split Preview</Text>
+            {computedSplit.map(sd => {
+              const p = participants.find(p => p.id === sd.participantId)
+              return (
+                <View key={sd.participantId} style={styles.previewRow}>
+                  <Text style={[styles.previewName, { color: colors.text }]}>
+                    {p?.name || 'Unknown'}
+                  </Text>
+                  <Text style={[styles.previewAmount, { color: colors.accent }]}>
+                    {formatCurrency(sd.value, trip?.currency)}
+                  </Text>
+                </View>
+              )
+            })}
+          </View>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e8e8e8',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  cancel: { fontSize: 16, color: '#007AFF' },
-  title: { fontSize: 17, fontWeight: '700', color: '#111' },
-  save: { fontSize: 16, color: '#007AFF', fontWeight: '600' },
-  saveDisabled: { color: '#ccc' },
-  content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
-  descriptionInput: {
-    fontSize: 20,
-    fontWeight: '500',
-    color: '#111',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e8e8e8',
-    marginBottom: 16,
-  },
-  amountRow: {
+  cancel: { ...typography.body },
+  title: { ...typography.headline },
+  save: { ...typography.bodyBold },
+  content: { padding: spacing.xl, paddingBottom: 100 },
+  amountSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e8e8e8',
-    paddingBottom: 12,
-    marginBottom: 20,
+    justifyContent: 'center',
+    paddingVertical: spacing.xxxl,
   },
-  currencySign: { fontSize: 28, fontWeight: '700', color: '#111', marginRight: 8 },
+  currencySign: {
+    fontSize: 32,
+    fontWeight: '600',
+    marginRight: spacing.sm,
+  },
   amountInput: {
-    flex: 1,
-    fontSize: 28,
+    fontSize: 48,
     fontWeight: '700',
-    color: '#111',
+    textAlign: 'center',
+    minWidth: 200,
   },
-  label: { fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 8, marginTop: 16 },
-  payerRow: { marginBottom: 8 },
-  payerBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
-    marginRight: 8,
+  descriptionInput: {
+    ...typography.body,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    marginBottom: spacing.xxl,
   },
-  payerActive: { backgroundColor: '#007AFF' },
-  payerText: { fontSize: 14, fontWeight: '600', color: '#666' },
-  payerTextActive: { color: '#fff' },
-  categoryRow: { marginBottom: 8 },
-  categoryBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: '#f0f0f0',
-    marginRight: 6,
+  label: {
+    ...typography.footnoteBold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing.sm,
+    marginTop: spacing.lg,
   },
-  categoryActive: { backgroundColor: '#E8F0FE' },
-  categoryText: { fontSize: 13, color: '#666' },
-  categoryTextActive: { color: '#007AFF', fontWeight: '600' },
-  error: { color: '#dc3545', fontSize: 14, marginTop: 8, textAlign: 'center' },
+  chipRow: {
+    marginBottom: spacing.sm,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.full,
+    marginRight: spacing.sm,
+  },
+  chipIcon: {
+    fontSize: 14,
+    marginRight: spacing.xs,
+  },
+  chipText: {
+    ...typography.subheadBold,
+  },
+  errorBox: {
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.md,
+  },
+  errorText: {
+    ...typography.footnoteBold,
+    textAlign: 'center',
+  },
+  previewBox: {
+    marginTop: spacing.lg,
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+  },
+  previewTitle: {
+    ...typography.captionBold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing.sm,
+  },
+  previewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+  },
+  previewName: {
+    ...typography.subhead,
+  },
+  previewAmount: {
+    ...typography.subheadBold,
+  },
 })

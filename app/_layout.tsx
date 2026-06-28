@@ -1,10 +1,23 @@
 import { useEffect, useState } from 'react'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { View, ActivityIndicator, Text } from 'react-native'
+import { View, Text, ActivityIndicator } from 'react-native'
 import { getGun, initDeviceId } from '../src/gun/setup'
 import { usePeerStore } from '../src/stores/peerStore'
 import { useTripStore } from '../src/stores/tripStore'
+import { ThemeProvider, useThemeColors, useTheme } from '../src/theme'
+
+function AppContent({ children }: { children: React.ReactNode }) {
+  const colors = useThemeColors()
+  const { isDark } = useTheme()
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      {children}
+    </View>
+  )
+}
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false)
@@ -28,25 +41,43 @@ export default function RootLayout() {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={{ marginTop: 12, color: '#666' }}>Starting up...</Text>
-      </View>
+      <ThemeProvider>
+        <SplashScreen />
+      </ThemeProvider>
     )
   }
 
   return (
-    <>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="trip/new" />
-        <Stack.Screen name="trip/[id]/index" />
-        <Stack.Screen name="trip/[id]/expense/add" />
-        <Stack.Screen name="trip/[id]/people" />
-        <Stack.Screen name="trip/[id]/settle" />
-        <Stack.Screen name="trip/[id]/sync" />
-      </Stack>
-    </>
+    <ThemeProvider>
+      <AppContent>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="trip/new" />
+          <Stack.Screen name="trip/[id]/index" />
+          <Stack.Screen name="trip/[id]/expense/add" />
+          <Stack.Screen name="trip/[id]/people" />
+          <Stack.Screen name="trip/[id]/settle" />
+          <Stack.Screen name="trip/[id]/sync" />
+        </Stack>
+      </AppContent>
+    </ThemeProvider>
+  )
+}
+
+function SplashScreen() {
+  const colors = useThemeColors()
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg }}>
+      <View style={{ alignItems: 'center' }}>
+        <Text style={{ fontSize: 48, marginBottom: 16 }}>{'\uD83D\uDCCB'}</Text>
+        <Text style={{ fontSize: 20, fontWeight: '700', color: colors.text, marginBottom: 4 }}>
+          Group Expense Tracker
+        </Text>
+        <Text style={{ fontSize: 14, color: colors.textMuted, marginBottom: 24 }}>
+          Loading your trips...
+        </Text>
+        <ActivityIndicator size="small" color={colors.accent} />
+      </View>
+    </View>
   )
 }

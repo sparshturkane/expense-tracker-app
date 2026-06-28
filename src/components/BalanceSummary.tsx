@@ -1,74 +1,99 @@
 import { View, Text, StyleSheet } from 'react-native'
 import { Balance, SettlementSuggestion } from '../types'
+import { useThemeColors, spacing, borderRadius, typography, shadows, formatCurrency } from '../theme'
 
 interface Props {
   balances: Balance[]
   settlementSuggestions: SettlementSuggestion[]
+  currency?: string
 }
 
-export default function BalanceSummary({ balances, settlementSuggestions }: Props) {
+export default function BalanceSummary({ balances, settlementSuggestions, currency = 'USD' }: Props) {
+  const colors = useThemeColors()
   const maxNet = Math.max(...balances.map(b => Math.abs(b.net)), 0.01)
 
-  if (balances.length === 0) {
-    return null
-  }
+  if (balances.length === 0) return null
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Balances</Text>
+    <View style={[styles.card, { backgroundColor: colors.bgSurface }, shadows.md]}>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Balances</Text>
 
       {balances.map(b => {
         const isPositive = b.net > 0
         const isZero = Math.abs(b.net) < 0.01
-        const barWidth = (Math.abs(b.net) / maxNet) * 100
+        const barWidth = Math.min((Math.abs(b.net) / maxNet) * 100, 100)
+        const barColor = isZero ? colors.textTertiary : isPositive ? colors.success : colors.error
 
         return (
           <View key={b.participantId} style={styles.row}>
-            <Text style={styles.name}>{b.name}</Text>
-            <View style={styles.barContainer}>
-              <View
+            <View style={styles.nameSection}>
+              <View style={[styles.avatar, { backgroundColor: barColor + '20' }]}>
+                <Text style={[styles.avatarText, { color: barColor }]}>
+                  {b.name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+                {b.name}
+              </Text>
+            </View>
+
+            <View style={styles.balanceSection}>
+              <View style={[styles.barBg, { backgroundColor: colors.bgTertiary }]}>
+                {!isZero && (
+                  <View
+                    style={[
+                      styles.bar,
+                      { width: `${barWidth}%`, backgroundColor: barColor },
+                    ]}
+                  />
+                )}
+              </View>
+              <Text
                 style={[
-                  styles.bar,
+                  styles.net,
                   {
-                    width: `${Math.min(barWidth, 100)}%`,
-                    backgroundColor: isZero
-                      ? '#ccc'
+                    color: isZero
+                      ? colors.textMuted
                       : isPositive
-                      ? '#34C759'
-                      : '#FF3B30',
+                        ? colors.success
+                        : colors.error,
                   },
                 ]}
-              />
+              >
+                {isZero
+                  ? `${formatCurrency(0, currency)}`
+                  : `${isPositive ? '+' : '-'}${formatCurrency(Math.abs(b.net), currency)}`}
+              </Text>
             </View>
-            <Text
-              style={[
-                styles.net,
-                isZero && styles.zero,
-                isPositive && styles.positive,
-                !isZero && !isPositive && styles.negative,
-              ]}
-            >
-              {isZero ? '$0' : `${isPositive ? '+' : '-'}$${Math.abs(b.net).toFixed(2)}`}
-            </Text>
           </View>
         )
       })}
 
       {settlementSuggestions.length > 0 && (
         <>
-          <View style={styles.divider} />
-          <Text style={styles.title}>Settlements</Text>
+          <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Settlements</Text>
+
           {settlementSuggestions.map((s, i) => (
             <View key={i} style={styles.settlementRow}>
-              <Text style={styles.settlementText}>
-                <Text style={styles.settlementName}>{s.fromName}</Text>
-                {' pays '}
-                <Text style={styles.settlementName}>{s.toName}</Text>
+              <View style={styles.settlementPeople}>
+                <Text style={[styles.settlementName, { color: colors.text }]}>
+                  {s.fromName}
+                </Text>
+                <Text style={[styles.settlementArrow, { color: colors.textMuted }]}>
+                  {' \u2192 '}
+                </Text>
+                <Text style={[styles.settlementName, { color: colors.text }]}>
+                  {s.toName}
+                </Text>
+              </View>
+              <Text style={[styles.settlementAmount, { color: colors.accent }]}>
+                {formatCurrency(s.amount, currency)}
               </Text>
-              <Text style={styles.settlementAmount}>${s.amount.toFixed(2)}</Text>
             </View>
           ))}
-          <Text style={styles.note}>
+
+          <Text style={[styles.note, { color: colors.textMuted }]}>
             {settlementSuggestions.length === 1
               ? '1 transaction needed'
               : `${settlementSuggestions.length} transactions needed`}
@@ -80,43 +105,91 @@ export default function BalanceSummary({ balances, settlementSuggestions }: Prop
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+  card: {
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginHorizontal: spacing.lg,
+    marginVertical: spacing.sm,
   },
-  title: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 12 },
-  row: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  name: { width: 80, fontSize: 14, color: '#333' },
-  barContainer: {
+  sectionTitle: {
+    ...typography.headline,
+    marginBottom: spacing.md,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  nameSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 110,
+  },
+  avatar: {
+    width: 28,
+    height: 28,
+    borderRadius: borderRadius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  avatarText: {
+    ...typography.captionBold,
+  },
+  name: {
+    ...typography.subheadBold,
     flex: 1,
-    height: 8,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 4,
-    marginHorizontal: 8,
+  },
+  balanceSection: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: spacing.sm,
+  },
+  barBg: {
+    flex: 1,
+    height: 6,
+    borderRadius: borderRadius.full,
+    marginRight: spacing.sm,
     overflow: 'hidden',
   },
-  bar: { height: '100%', borderRadius: 4 },
-  net: { width: 80, textAlign: 'right', fontSize: 14, fontWeight: '600' },
-  positive: { color: '#34C759' },
-  negative: { color: '#FF3B30' },
-  zero: { color: '#999' },
-  divider: { height: 1, backgroundColor: '#eee', marginVertical: 12 },
+  bar: {
+    height: '100%',
+    borderRadius: borderRadius.full,
+  },
+  net: {
+    ...typography.subheadBold,
+    width: 72,
+    textAlign: 'right',
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: spacing.md,
+  },
   settlementRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: spacing.sm,
   },
-  settlementText: { fontSize: 14, color: '#333' },
-  settlementName: { fontWeight: '600', color: '#111' },
-  settlementAmount: { fontSize: 14, fontWeight: '700', color: '#007AFF' },
-  note: { fontSize: 12, color: '#999', marginTop: 8, textAlign: 'center' },
+  settlementPeople: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  settlementName: {
+    ...typography.subheadBold,
+  },
+  settlementArrow: {
+    ...typography.subhead,
+  },
+  settlementAmount: {
+    ...typography.subheadBold,
+  },
+  note: {
+    ...typography.caption,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
 })

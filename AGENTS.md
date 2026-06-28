@@ -174,6 +174,54 @@ Greedy algorithm:
 
 ---
 
+## Design System
+
+All UI code uses a centralized design system in `src/theme/`:
+
+| File | Purpose |
+|------|---------|
+| `constants.ts` | `ThemeColors` interface + `DARK_THEME` / `LIGHT_THEME` color palettes + `spacing`, `borderRadius`, `typography`, `shadows` design tokens |
+| `provider.tsx` | `ThemeProvider` (wraps app root) + `useTheme()` / `useThemeColors()` hooks. Uses `useColorScheme()` from RN to auto-detect system dark/light mode. |
+| `index.ts` | Re-exports all theme utilities |
+
+### Usage pattern:
+```tsx
+import { useThemeColors, spacing, borderRadius, typography, shadows } from '../theme'
+
+function Component() {
+  const colors = useThemeColors()
+  return (
+    <View style={[styles.card, { backgroundColor: colors.bgSurface }, shadows.md]}>
+      <Text style={[styles.title, { color: colors.text }]}>Hello</Text>
+    </View>
+  )
+}
+```
+
+### Color tokens:
+- `bg` — root background
+- `bgSurface` — card/surface background  
+- `bgSecondary` / `bgTertiary` — lower-level surfaces
+- `text` / `textSecondary` / `textMuted` / `textTertiary` — text hierarchy
+- `accent` / `accentLight` / `accentDark` — primary action color
+- `success` / `error` / `warning` — semantic colors (each has a `*Light` variant for backgrounds)
+- `border` / `borderLight` / `divider` — border hierarchy
+- `card` / `navBar` / `tabBar` — contextual surfaces
+- `skeleton` / `skeletonHighlight` — loading state colors
+
+### Key UX/UI decisions:
+- iOS-inspired design language (SF-style typography, generous spacing, frosted nav bars)
+- Cards use `borderRadius.lg` (14px) with `shadows.md` for depth
+- All interactive elements have minimum 44pt touch targets
+- Semantic colors for balance (green = positive, red = negative)
+- Category colors mapped per expense type
+- Alphabetical sections in People screen
+- Search bar on Home screen
+- Split preview on Add Expense screen
+- Pull-to-refresh ready (RefreshControl import available)
+
+---
+
 ## Current Implementation Status
 
 | Feature | Status | File |
@@ -189,6 +237,13 @@ Greedy algorithm:
 | QR Scanning (camera import) | ❌ Not implemented | `sync.tsx` (CameraView import exists, unused) |
 | Gun.js P2P Auto-Sync | ✅ Done | `gun/setup.ts`, stores subscribe via `on()` |
 | Web Support | ✅ Done | `react-native-web` installed |
+| Design System (Theme) | ✅ Done | `src/theme/` — dark/light auto-detection |
+| Search & Filter | ✅ Done | `app/index.tsx` — search bar on Home |
+| Category Colors | ✅ Done | `ExpenseCard.tsx` — per-category color indicators |
+| Alphabetical Sections | ✅ Done | `app/trip/[id]/people.tsx` — SectionList |
+| Split Preview | ✅ Done | `add.tsx` — live split calculation preview |
+| Enhanced Settlement UI | ✅ Done | `settle.tsx` — visual payer/payee flow |
+| Segment Control Nav | ✅ Done | `sync.tsx` — iOS-style segmented control |
 
 ---
 
@@ -200,7 +255,7 @@ Greedy algorithm:
 4. **QR scanning** — The `CameraView` from `expo-camera` is imported in `sync.tsx` but unused. The barcode scanner flow needs to be built: request camera permissions, render CameraView with `onBarcodeScanned`, parse the JSON, and trigger the merge import.
 5. **Gun.js peer discovery** — Currently uses Gun's default peer discovery (no explicit peers configured). For internet-based sync, peers need to either: (a) connect to a common relay, or (b) exchange connection info via QR. Currently, sync works over LAN or if both devices connect to the same Gun peer relay.
 6. **No input validation on amounts** — The app trusts user input for amounts. Consider adding max-value guards.
-7. **No dark mode** — `userInterfaceStyle` is set to `"automatic"` in app.json, but no dark mode stylesheets are implemented.
+7. **Dark mode** — System dark/light mode is fully supported via the theme provider. The app auto-detects the system appearance.
 
 ---
 
@@ -228,10 +283,9 @@ npx expo export --platform web      # Web bundle
 
 1. **QR scanning** — Complete the camera import flow in `sync.tsx`
 2. **Edit/delete expenses** — Edit endpoint exists in `expenseStore.ts`, needs UI in `ExpenseCard.tsx`
-3. **Categories with color coding** — Each expense category gets a distinct color dot
+3. **Edit/delete expenses** — Edit endpoint exists in `expenseStore.ts`, needs UI in `ExpenseCard.tsx`
 4. **Receipt image attachment** — Use `expo-image-picker` to attach receipt photos
-5. **Dark mode** — Implement theme switching with dark color palette
-6. **Multi-currency conversion** — Exchange rates API for trips with mixed currencies
+5. **Multi-currency conversion** — Exchange rates API for trips with mixed currencies
 7. **Push notifications** — When a peer adds an expense, notify others
 8. **Gun.js relay peer** — Option to connect to a public Gun relay for internet-based sync without QR
 9. **Testing** — Add Jest/React Native Testing Library tests for balance/split logic

@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "darkMode": true,
-"userInterfaceStyle": "light",
+"userInterfaceStyle": "automatic",
     "scheme": "expense-tracker",
     "ios": {
       "supportsTablet": true,

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ScrollView,
 } from 'react-native'
 import { SplitType, SplitDetail } from '../types'
+import { useThemeColors, spacing, borderRadius, typography, formatCurrency } from '../theme'
 
 interface Props {
   amount: number
@@ -18,7 +19,14 @@ interface Props {
   onSplitAmongChange: (ids: string[]) => void
   onSplitDetailsChange: (details: SplitDetail[]) => void
   error?: string | null
+  currency?: string
 }
+
+const TYPES: { key: SplitType; label: string; icon: string }[] = [
+  { key: 'equal', label: 'Equal', icon: '\u2261' },
+  { key: 'custom', label: 'Custom', icon: '\u270E' },
+  { key: 'percentage', label: '%', icon: '%' },
+]
 
 export default function SplitSelector({
   amount,
@@ -29,7 +37,9 @@ export default function SplitSelector({
   onSplitAmongChange,
   onSplitDetailsChange,
   error,
+  currency = 'USD',
 }: Props) {
+  const colors = useThemeColors()
   const [customValues, setCustomValues] = useState<Record<string, string>>({})
   const [pctValues, setPctValues] = useState<Record<string, string>>({})
 
@@ -61,16 +71,24 @@ export default function SplitSelector({
     onSplitDetailsChange(allDetails)
   }
 
-  const types: { key: SplitType; label: string }[] = [
-    { key: 'equal', label: 'Equal' },
-    { key: 'custom', label: 'Custom' },
-    { key: 'percentage', label: '%' },
-  ]
+  const perPerson = amount / Math.max(splitAmong.length, 1)
+
+  const totalFilled = useMemo(() => {
+    if (splitType === 'custom')
+      return Object.values(customValues).reduce((s, v) => s + (parseFloat(v) || 0), 0)
+    if (splitType === 'percentage')
+      return Object.values(pctValues).reduce((s, v) => s + (parseFloat(v) || 0), 0)
+    return 0
+  }, [splitType, customValues, pctValues])
+
+  const remaining = splitType === 'custom' ? amount - totalFilled : splitType === 'percentage' ? 100 - totalFilled : 0
 
   if (participants.length === 0) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.label}>No participants added yet</Text>
+      <View style={[styles.emptyContainer, { backgroundColor: colors.bgSecondary }]}>
+        <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+          Add participants to split expenses
+        </Text>
       </View>
     )
   }
@@ -78,45 +96,78 @@ export default function SplitSelector({
   return (
     <View style={styles.container}>
       <View style={styles.typeRow}>
-        {types.map(t => (
+        {TYPES.map(t => (
           <TouchableOpacity
             key={t.key}
-            style={[styles.typeBtn, splitType === t.key && styles.typeBtnActive]}
+            style={[
+              styles.typeBtn,
+              { backgroundColor: colors.bgTertiary },
+              splitType === t.key && { backgroundColor: colors.accent },
+            ]}
             onPress={() => {
               onSplitTypeChange(t.key)
               if (t.key === 'equal') onSplitDetailsChange([])
+              setCustomValues({})
+              setPctValues({})
             }}
           >
             <Text
               style={[
                 styles.typeBtnText,
-                splitType === t.key && styles.typeBtnTextActive,
+                { color: colors.textMuted },
+                splitType === t.key && { color: '#fff' },
               ]}
             >
-              {t.label}
+              {t.icon} {t.label}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      <Text style={styles.label}>Split among</Text>
-      <ScrollView style={styles.participantList}>
+      <Text style={[styles.label, { color: colors.textSecondary }]}>Split among</Text>
+
+      <ScrollView style={styles.participantList} showsVerticalScrollIndicator={false}>
         {participants.map(p => {
           const selected = splitAmong.includes(p.id)
           return (
             <TouchableOpacity
               key={p.id}
-              style={[styles.participantRow, selected && styles.participantSelected]}
+              style={[
+                styles.participantRow,
+                { backgroundColor: colors.bgSecondary },
+                selected && { backgroundColor: colors.accentLight },
+              ]}
               onPress={() => toggleParticipant(p.id)}
             >
-              <View style={styles.checkbox}>
-                {selected && <Text style={styles.checkmark}>✓</Text>}
+              <View
+                style={[
+                  styles.checkbox,
+                  { borderColor: colors.border },
+                  selected && { borderColor: colors.accent, backgroundColor: colors.accent },
+                ]}
+              >
+                {selected && (
+                  <Text style={styles.checkmark}>{'\u2713'}</Text>
+                )}
               </View>
-              <Text style={styles.participantName}>{p.name}</Text>
+              <Text
+                style={[
+                  styles.participantName,
+                  { color: colors.text },
+                  selected && { fontWeight: '600' },
+                ]}
+              >
+                {p.name}
+              </Text>
+
               {selected && splitType === 'custom' && (
                 <TextInput
-                  style={styles.valueInput}
+                  style={[
+                    styles.valueInput,
+                    { backgroundColor: colors.bgSurface, borderColor: colors.border, color: colors.text },
+                  ]}
                   placeholder="0.00"
+                  placeholderTextColor={colors.textTertiary}
                   keyboardType="decimal-pad"
                   value={customValues[p.id] || ''}
                   onChangeText={v => handleCustomValue(p.id, v)}
@@ -124,16 +175,20 @@ export default function SplitSelector({
               )}
               {selected && splitType === 'percentage' && (
                 <TextInput
-                  style={styles.valueInput}
+                  style={[
+                    styles.valueInput,
+                    { backgroundColor: colors.bgSurface, borderColor: colors.border, color: colors.text },
+                  ]}
                   placeholder="0"
+                  placeholderTextColor={colors.textTertiary}
                   keyboardType="decimal-pad"
                   value={pctValues[p.id] || ''}
                   onChangeText={v => handlePctValue(p.id, v)}
                 />
               )}
               {selected && splitType === 'equal' && (
-                <Text style={styles.equalShare}>
-                  ${(amount / Math.max(splitAmong.length, 1)).toFixed(2)}
+                <Text style={[styles.equalShare, { color: colors.accent }]}>
+                  {formatCurrency(perPerson, currency)}
                 </Text>
               )}
             </TouchableOpacity>
@@ -141,58 +196,138 @@ export default function SplitSelector({
         })}
       </ScrollView>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {(splitType === 'custom' || splitType === 'percentage') && splitAmong.length > 0 && (
+        <View style={[styles.summaryBar, { backgroundColor: colors.bgSecondary }]}>
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
+              {splitType === 'custom' ? 'Allocated' : 'Allocated'}
+            </Text>
+            <Text style={[styles.summaryValue, { color: colors.text }]}>
+              {splitType === 'custom'
+                ? formatCurrency(totalFilled, currency)
+                : `${totalFilled.toFixed(1)}%`}
+            </Text>
+          </View>
+          {remaining > 0.01 && (
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: colors.warning }]}>
+                Remaining
+              </Text>
+              <Text style={[styles.summaryValue, { color: colors.warning }]}>
+                {splitType === 'custom'
+                  ? formatCurrency(remaining, currency)
+                  : `${remaining.toFixed(1)}%`}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {error && (
+        <View style={[styles.errorContainer, { backgroundColor: colors.errorLight }]}>
+          <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
+        </View>
+      )}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { marginBottom: 16 },
-  typeRow: { flexDirection: 'row', marginBottom: 12, gap: 8 },
-  typeBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
+  container: { marginBottom: spacing.lg },
+  emptyContainer: {
+    padding: spacing.xxl,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
   },
-  typeBtnActive: { backgroundColor: '#007AFF' },
-  typeBtnText: { fontSize: 15, fontWeight: '600', color: '#666' },
-  typeBtnTextActive: { color: '#fff' },
-  label: { fontSize: 15, fontWeight: '600', marginBottom: 8, color: '#333' },
-  participantList: { maxHeight: 200 },
+  emptyText: {
+    ...typography.subhead,
+    textAlign: 'center',
+  },
+  typeRow: {
+    flexDirection: 'row',
+    marginBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  typeBtn: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  typeBtnText: {
+    ...typography.subheadBold,
+  },
+  label: {
+    ...typography.footnoteBold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing.sm,
+  },
+  participantList: {
+    maxHeight: 240,
+  },
   participantRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 4,
-    backgroundColor: '#f8f8f8',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.xs,
   },
-  participantSelected: { backgroundColor: '#E8F0FE' },
   checkbox: {
     width: 22,
     height: 22,
-    borderRadius: 4,
+    borderRadius: borderRadius.sm,
     borderWidth: 2,
-    borderColor: '#ccc',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: spacing.md,
   },
-  checkmark: { color: '#007AFF', fontWeight: '700' },
-  participantName: { flex: 1, fontSize: 15, color: '#333' },
+  checkmark: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  participantName: {
+    ...typography.body,
+    flex: 1,
+  },
   valueInput: {
     width: 80,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    fontSize: 14,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    ...typography.subheadBold,
     textAlign: 'right',
   },
-  equalShare: { fontSize: 14, color: '#007AFF', fontWeight: '500' },
-  error: { color: '#dc3545', fontSize: 13, marginTop: 6 },
+  equalShare: {
+    ...typography.subheadBold,
+  },
+  summaryBar: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  summaryLabel: {
+    ...typography.footnote,
+  },
+  summaryValue: {
+    ...typography.footnoteBold,
+  },
+  errorContainer: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+  },
+  errorText: {
+    ...typography.footnoteBold,
+    textAlign: 'center',
+  },
 })

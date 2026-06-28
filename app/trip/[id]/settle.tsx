@@ -13,11 +13,13 @@ import { useExpenseStore } from '../../../src/stores/expenseStore'
 import { useTripStore } from '../../../src/stores/tripStore'
 import { calculateBalances, calculateSettlements } from '../../../src/utils/balance'
 import BalanceSummary from '../../../src/components/BalanceSummary'
+import { useThemeColors, spacing, borderRadius, typography, shadows, formatCurrency, getCurrencySymbol } from '../../../src/theme'
 
 export default function SettleScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const insets = useSafeAreaInsets()
+  const colors = useThemeColors()
 
   const trip = useTripStore(s => s.trips.find(t => t.id === id))
   const { participantsByTrip, expensesByTrip, settlementsByTrip, addSettlement } = useExpenseStore()
@@ -42,7 +44,7 @@ export default function SettleScreen() {
 
     Alert.alert(
       'Confirm Settlement',
-      `${fromName} will pay ${toName} $${amount.toFixed(2)}.`,
+      `${fromName} will pay ${toName} ${formatCurrency(amount, trip?.currency)}.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -59,46 +61,78 @@ export default function SettleScreen() {
   const allSettled = balances.every(b => Math.abs(b.net) < 0.01)
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
+      <View style={[styles.header, { borderBottomColor: colors.divider, backgroundColor: colors.navBar }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.back}>‹ Back</Text>
+          <Text style={[styles.back, { color: colors.accent }]}>{'\u2039'} Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Settle Up</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Settle Up</Text>
         <View style={{ width: 50 }} />
       </View>
 
       {allSettled ? (
-        <View style={styles.allSettled}>
-          <Text style={styles.allSettledIcon}>✅</Text>
-          <Text style={styles.allSettledTitle}>All settled up!</Text>
-          <Text style={styles.allSettledText}>No outstanding balances</Text>
+        <View style={styles.center}>
+          <View style={[styles.settledIcon, { backgroundColor: colors.successLight }]}>
+            <Text style={{ fontSize: 36 }}>{'\u2714\uFE0F'}</Text>
+          </View>
+          <Text style={[styles.settledTitle, { color: colors.text }]}>All settled up!</Text>
+          <Text style={[styles.settledText, { color: colors.textSecondary }]}>
+            No outstanding balances
+          </Text>
         </View>
       ) : (
         <FlatList
           data={suggestions}
           keyExtractor={(_, i) => String(i)}
+          showsVerticalScrollIndicator={false}
           ListHeaderComponent={
-            <BalanceSummary balances={balances} settlementSuggestions={suggestions} />
+            <>
+              <BalanceSummary balances={balances} settlementSuggestions={suggestions} currency={trip?.currency} />
+              {suggestions.length > 0 && (
+                <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+                  Mark as Paid
+                </Text>
+              )}
+            </>
           }
           contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            <BalanceSummary balances={balances} settlementSuggestions={suggestions} currency={trip?.currency} />
+          }
           renderItem={({ item }) => (
-            <View style={styles.suggestionCard}>
-              <View style={styles.suggestionInfo}>
-                <Text style={styles.suggestionText}>
-                  <Text style={styles.bold}>{item.fromName}</Text>
-                  {' → '}
-                  <Text style={styles.bold}>{item.toName}</Text>
-                </Text>
-                <Text style={styles.suggestionAmount}>
-                  ${item.amount.toFixed(2)}
+            <View style={[styles.suggestionCard, { backgroundColor: colors.bgSurface }, shadows.sm]}>
+              <View style={styles.suggestionTop}>
+                <View style={styles.suggestionPeople}>
+                  <View style={[styles.personIcon, { backgroundColor: colors.errorLight }]}>
+                    <Text style={[styles.personInitial, { color: colors.error }]}>
+                      {item.fromName.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.arrowContainer}>
+                    <Text style={[styles.arrow, { color: colors.textMuted }]}>{'\u2192'}</Text>
+                  </View>
+                  <View style={[styles.personIcon, { backgroundColor: colors.successLight }]}>
+                    <Text style={[styles.personInitial, { color: colors.success }]}>
+                      {item.toName.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={[styles.amount, { color: colors.accent }]}>
+                  $                {formatCurrency(item.amount, trip?.currency)}
                 </Text>
               </View>
+
+              <View style={styles.suggestionNames}>
+                <Text style={[styles.nameLabel, { color: colors.error }]}>{item.fromName}</Text>
+                <Text style={[styles.paysLabel, { color: colors.textMuted }]}> pays </Text>
+                <Text style={[styles.nameLabel, { color: colors.success }]}>{item.toName}</Text>
+              </View>
+
               <TouchableOpacity
-                style={styles.settleBtn}
+                style={[styles.settleBtn, { backgroundColor: colors.success }]}
                 onPress={() => handleSettle(item.from, item.to, item.amount)}
               >
-                <Text style={styles.settleBtnText}>Mark Paid</Text>
+                <Text style={styles.settleBtnText}>Mark as Paid</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -109,54 +143,112 @@ export default function SettleScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f2f2f7' },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e8e8e8',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  back: { fontSize: 16, color: '#007AFF', marginRight: 12 },
-  title: { flex: 1, fontSize: 18, fontWeight: '700', color: '#111', textAlign: 'center' },
-  list: { paddingBottom: 40 },
+  back: {
+    ...typography.body,
+    fontWeight: '600',
+  },
+  title: {
+    ...typography.headline,
+    flex: 1,
+    textAlign: 'center',
+  },
+  list: {
+    paddingBottom: spacing.xxxxl,
+  },
+  sectionLabel: {
+    ...typography.footnoteBold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
   suggestionCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 10,
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
   },
-  suggestionInfo: {
+  suggestionTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: spacing.sm,
   },
-  suggestionText: { fontSize: 16, color: '#333' },
-  bold: { fontWeight: '700', color: '#111' },
-  suggestionAmount: { fontSize: 18, fontWeight: '700', color: '#007AFF' },
-  settleBtn: {
-    backgroundColor: '#34C759',
-    paddingVertical: 12,
-    borderRadius: 8,
+  suggestionPeople: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  settleBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  allSettled: {
+  personIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  personInitial: {
+    ...typography.title3,
+    fontWeight: '700',
+  },
+  arrowContainer: {
+    paddingHorizontal: spacing.sm,
+  },
+  arrow: {
+    fontSize: 20,
+    fontWeight: '300',
+  },
+  amount: {
+    ...typography.title3,
+    fontWeight: '800',
+  },
+  suggestionNames: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  nameLabel: {
+    ...typography.subheadBold,
+  },
+  paysLabel: {
+    ...typography.subhead,
+  },
+  settleBtn: {
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  settleBtnText: {
+    color: '#fff',
+    ...typography.headline,
+  },
+  center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: spacing.xxxxl,
   },
-  allSettledIcon: { fontSize: 48, marginBottom: 16 },
-  allSettledTitle: { fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 8 },
-  allSettledText: { fontSize: 15, color: '#666', textAlign: 'center' },
+  settledIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: borderRadius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  settledTitle: {
+    ...typography.title1,
+    marginBottom: spacing.sm,
+  },
+  settledText: {
+    ...typography.callout,
+    textAlign: 'center',
+  },
 })
