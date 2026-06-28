@@ -5,9 +5,15 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
+    "scheme": "expense-tracker",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.expensetracker.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "We need camera access to scan QR codes for sharing expense data with friends.",
+        "NSLocalNetworkUsageDescription": "This app uses the network to sync expense data with other devices."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -16,10 +22,25 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.INTERNET"
+      ],
+      "package": "com.expensetracker.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow expense-tracker to access your camera for scanning QR codes."
+        }
+      ],
+      "expo-router"
+    ]
   }
 }
