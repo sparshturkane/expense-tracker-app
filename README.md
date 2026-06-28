@@ -76,7 +76,8 @@ A serverless, decentralized mobile app for tracking shared expenses among friend
 - Node.js 18+
 - npm or yarn
 - Expo CLI (`npx expo`)
-- iOS Simulator (Mac) or Android Emulator, or a physical device with Expo Go
+- Expo Go app on your phone (iOS or Android)
+- iOS Simulator (Mac) or Android Emulator (optional)
 
 ### Installation
 
@@ -92,11 +93,14 @@ npm install
 # Start the dev server
 npx expo start
 
-# Run on specific platform
+# Scan the QR code with Expo Go on your phone
+
+# Or run on a simulator:
 npx expo start --ios
 npx expo start --android
 
-# Scan the QR code with Expo Go on your phone
+# Or run on web:
+npx expo start --web
 ```
 
 ### Building for Production

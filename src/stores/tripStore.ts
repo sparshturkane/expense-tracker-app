@@ -10,6 +10,7 @@ interface TripStore {
   createTrip: (name: string, currency: string) => Trip
   updateTrip: (id: string, updates: Partial<Trip>) => void
   deleteTrip: (id: string) => void
+  touchTrip: (id: string) => void
 }
 
 export const useTripStore = create<TripStore>((set, get) => ({
@@ -18,6 +19,7 @@ export const useTripStore = create<TripStore>((set, get) => ({
 
   loadTrips: () => {
     const gun = getGun()
+    let hasFired = false
     gun.get('trips').map().on((data: any, key: string) => {
       if (data && data.name) {
         set(state => {
@@ -36,7 +38,12 @@ export const useTripStore = create<TripStore>((set, get) => ({
           }
         })
       }
+      if (!hasFired) {
+        hasFired = true
+        set({ loading: false })
+      }
     })
+    setTimeout(() => set({ loading: false }), 3000)
   },
 
   createTrip: (name: string, currency: string) => {
@@ -53,6 +60,10 @@ export const useTripStore = create<TripStore>((set, get) => ({
       const updated = { ...trip, ...updates, updatedAt: new Date().toISOString() }
       getGun().get('trips').get(id).put(updated)
     }
+  },
+
+  touchTrip: (id: string) => {
+    getGun().get('trips').get(id).get('updatedAt').put(new Date().toISOString())
   },
 
   deleteTrip: (id: string) => {

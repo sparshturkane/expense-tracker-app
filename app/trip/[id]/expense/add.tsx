@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   View,
   Text,
@@ -39,6 +39,13 @@ export default function AddExpenseScreen() {
   const [splitDetails, setSplitDetails] = useState<SplitDetail[]>([])
   const [category, setCategory] = useState('')
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (participants.length > 0) {
+      setSplitAmong(participants.map(p => p.id))
+      if (!paidBy) setPaidBy(participants[0].id)
+    }
+  }, [participants.length])
 
   const numAmount = parseFloat(amount) || 0
 

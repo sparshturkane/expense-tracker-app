@@ -84,11 +84,24 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     const id = uuid()
     const participant: Participant = { id, name, createdAt: new Date().toISOString() }
     getGun().get('trips').get(tripId).get('participants').get(id).put(participant)
+    getGun().get('trips').get(tripId).get('updatedAt').put(new Date().toISOString())
+
+    set(state => ({
+      participantsByTrip: {
+        ...state.participantsByTrip,
+        [tripId]: [
+          ...(state.participantsByTrip[tripId] || []).filter(p => p.id !== id),
+          participant,
+        ],
+      },
+    }))
+
     return participant
   },
 
   removeParticipant: (tripId: string, participantId: string) => {
     getGun().get('trips').get(tripId).get('participants').get(participantId).put(null)
+    getGun().get('trips').get(tripId).get('updatedAt').put(new Date().toISOString())
     set(state => ({
       participantsByTrip: {
         ...state.participantsByTrip,
@@ -131,6 +144,18 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     }
 
     getGun().get('trips').get(tripId).get('expenses').get(id).put(expense)
+    getGun().get('trips').get(tripId).get('updatedAt').put(new Date().toISOString())
+
+    set(state => ({
+      expensesByTrip: {
+        ...state.expensesByTrip,
+        [tripId]: [
+          ...(state.expensesByTrip[tripId] || []).filter(e => e.id !== id),
+          expense,
+        ],
+      },
+    }))
+
     return expense
   },
 
@@ -149,6 +174,7 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
 
   deleteExpense: (tripId: string, expenseId: string) => {
     getGun().get('trips').get(tripId).get('expenses').get(expenseId).put(null)
+    getGun().get('trips').get(tripId).get('updatedAt').put(new Date().toISOString())
     set(state => ({
       expensesByTrip: {
         ...state.expensesByTrip,
@@ -171,6 +197,7 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
       date: new Date().toISOString(),
     }
     getGun().get('trips').get(tripId).get('settlements').get(id).put(settlement)
+    getGun().get('trips').get(tripId).get('updatedAt').put(new Date().toISOString())
     return settlement
   },
 
