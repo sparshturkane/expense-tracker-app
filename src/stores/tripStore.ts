@@ -51,6 +51,9 @@ export const useTripStore = create<TripStore>((set, get) => ({
     const now = new Date().toISOString()
     const trip: Trip = { id, name, currency, createdAt: now, updatedAt: now }
     getGun().get('trips').get(id).put(trip)
+    set(state => ({
+      trips: [...state.trips.filter(t => t.id !== id), trip],
+    }))
     return trip
   },
 
