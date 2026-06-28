@@ -55,20 +55,26 @@ expense-tracker-app/
 │           └── sync.tsx                 # SYNC: QR code gen, JSON file export/import
 │
 ├── src/
-│   ├── gun/
-│   │   ├── setup.ts                     # Gun() singleton init, device ID generation
-│   │   └── adapter.ts                   # AsyncStorage read/write adapters for Gun persistence
+│   ├── server/
+│   │   └── relay.js                     # Gun relay server (Node.js, for internet-based sync)
 │   │
-│   ├── stores/
-│   │   ├── tripStore.ts                 # Zustand: trips list, CRUD, subscribed to Gun graph
-│   │   ├── expenseStore.ts             # Zustand: expenses/participants/settlements per trip
-│   │   └── peerStore.ts                # Zustand: device ID + connected peers
-│   │
-│   ├── components/
-│   │   ├── SplitSelector.tsx            # Split mode UI: equal / custom / percentage toggles
-│   │   ├── ExpenseCard.tsx              # Single expense display: payer, split details, delete
-│   │   ├── BalanceSummary.tsx           # Balance bars + minimum-payout settlement list
-│   │   └── SyncStatusBar.tsx            # "Offline" / "N peers connected" indicator
+│   ├── src/
+│   │   ├── gun/
+│   │   │   ├── setup.ts                 # Gun() singleton init, device ID, relay config, peer events
+│   │   │   └── adapter.ts               # AsyncStorage read/write adapters for Gun persistence
+│   │   │
+│   │   ├── stores/
+│   │   │   ├── tripStore.ts             # Zustand: trips list, CRUD, subscribed to Gun graph
+│   │   │   ├── expenseStore.ts          # Zustand: expenses/participants/settlements + remote change detection
+│   │   │   ├── peerStore.ts             # Zustand: device ID + connected peers + relay URL
+│   │   │   └── notificationStore.ts     # Zustand: in-app notification queue
+│   │   │
+│   │   ├── components/
+│   │   │   ├── SplitSelector.tsx            # Split mode UI: equal / custom / percentage toggles
+│   │   │   ├── ExpenseCard.tsx              # Single expense display: payer, split details, delete
+│   │   │   ├── BalanceSummary.tsx           # Balance bars + minimum-payout settlement list
+│   │   │   ├── SyncStatusBar.tsx            # "Offline" / "N peers connected" indicator
+│   │   │   └── InAppNotification.tsx        # Animated toast banner for real-time change alerts
 │   │
 │   ├── utils/
 │   │   ├── split.ts                     # Split calculation & validation (equal/custom/%)
@@ -100,7 +106,7 @@ Trip
   └── updatedAt: string (ISO)
   │
   ├── participants/{id}
-  │   └── { id, name, createdAt }
+  │   └── { id, name, createdAt, addedByDevice? }
   │
   ├── expenses/{id}
   │   └── { id, tripId, description, amount, paidBy,
@@ -122,6 +128,8 @@ Gun.js graph keys: `trips` → `{tripId}` → `participants|expenses|settlements
    - `shim.js` polyfills Buffer/TextEncoder/TextDecoder
    - `getGun()` creates singleton Gun instance with AsyncStorage store
    - `initDeviceId()` gets/persists a UUID for this device
+   - `initRelay()` reads stored relay URL from AsyncStorage → passes to `gun.opt({ peers: [url] })`
+   - `initPeerTracking()` listens for `gun.on('hi'/'bye')` events → updates peerStore
    - `loadTrips()` subscribes to Gun `trips` node — reactive, updates on any peer change
 
 2. **User creates data**:
@@ -130,14 +138,29 @@ Gun.js graph keys: `trips` → `{tripId}` → `participants|expenses|settlements
    - Gun.js persists to AsyncStorage + broadcasts to connected peers
    - Gun reactive `on()` callback fires → Zustand state updates → UI re-renders
 
-3. **Sync between devices**:
-   - Gun.js WebSocket/WebRTC peers discover each other (when connected to same network or via relay)
-   - Data syncs automatically with CRDT conflict resolution (last-write-wins per field)
-   - No manual push/pull needed — it's real-time by default
+3. **Sync between devices** (via Gun relay):
+   - Both devices connect to the same Gun relay server → data syncs via WebSocket
+   - Gun.js syncs automatically with CRDT conflict resolution (last-write-wins per field)
+   - Real-time: changes from one peer appear on the other within seconds
+   - `peerStore.connectedPeers` shows live count of connected peers
+   - `SyncStatusBar` displays "N peers connected" or "Offline"
 
-4. **File fallback sync** (`sync.tsx`):
+4. **In-app notifications** (when app is open):
+   - `expenseStore.loadTripData()` tracks known entity IDs per trip
+   - After 2s initial load, new items syncing in from other devices trigger `notificationStore.show()`
+   - `InAppNotification` component renders an animated toast banner (4s auto-dismiss)
+   - Currently fires for: new expenses from other devices (`addedByDevice !== deviceId`)
+   - Future: participants joining, settlements marked paid
+
+5. **QR-based peer sharing** (`sync.tsx` "Share" tab):
+   - QR encodes `gun://{relay-host}/trips/{tripId}` — compact enough for QR limits
+   - Other user scans QR (or enters trip ID manually) in "Join" tab
+   - Their app connects to the same relay → trip data syncs automatically
+   - No manual import needed — real-time sync handles it
+
+6. **File fallback sync** (`sync.tsx` "File" tab):
    - Export: serializes entire Gun graph state as JSON → writes to cache → shares via OS share sheet
-   - Import: reads JSON file → reconciles with existing data by UUID (newer `updatedAt` wins)
+   - Import: reads JSON file → reconciles with existing data by UUID (newer `updatedAt` wins) → writes merged data back to Gun
 
 ---
 
@@ -234,8 +257,14 @@ function Component() {
 | Mark Settlements Paid | ✅ Done | `settle.tsx`, `expenseStore.ts` |
 | QR Code Export | ✅ Done | `sync.tsx` |
 | JSON File Export/Import | ✅ Done | `sync.tsx`, `merge.ts` |
-| QR Scanning (camera import) | ❌ Not implemented | `sync.tsx` (CameraView import exists, unused) |
+| QR Scanning (camera import) | ✅ Done | `sync.tsx` (CameraView + onBarcodeScanned) |
 | Gun.js P2P Auto-Sync | ✅ Done | `gun/setup.ts`, stores subscribe via `on()` |
+| Gun Relay Server | ✅ Done | `server/relay.js` |
+| Gun Peer Tracking | ✅ Done | `gun/setup.ts` — `initPeerTracking()` via `gun.on('hi'/'bye')` |
+| Relay URL Config | ✅ Done | `src/gun/setup.ts` — `initRelay()` + `setRelayUrl()`, stored in AsyncStorage |
+| In-App Notifications | ✅ Done | `InAppNotification.tsx`, `notificationStore.ts` |
+| Share/Join Trip (QR) | ✅ Done | `sync.tsx` — Share tab (QR with `gun://` format) |
+| Join Trip (Scan QR) | ✅ Done | `sync.tsx` — Join tab (CameraView scanner + manual entry) |
 | Web Support | ✅ Done | `react-native-web` installed |
 | Design System (Theme) | ✅ Done | `src/theme/` — dark/light auto-detection |
 | Search & Filter | ✅ Done | `app/index.tsx` — search bar on Home |
@@ -252,8 +281,8 @@ function Component() {
 1. **Gun.js does not use SEA** — WebCrypto unavailable in React Native. Device identity uses UUID. This means no built-in encryption. If encryption is needed later, peer auth must be added.
 2. **expo-file-system uses legacy API** — SDK 56 moved the old file API to `expo-file-system/legacy`. Always import from there.
 3. **react-native-reanimated 4.x** — Requires `react-native-worklets` as a separate npm package. If reanimated-related errors appear, check that `react-native-worklets` is installed.
-4. **QR scanning** — The `CameraView` from `expo-camera` is imported in `sync.tsx` but unused. The barcode scanner flow needs to be built: request camera permissions, render CameraView with `onBarcodeScanned`, parse the JSON, and trigger the merge import.
-5. **Gun.js peer discovery** — Currently uses Gun's default peer discovery (no explicit peers configured). For internet-based sync, peers need to either: (a) connect to a common relay, or (b) exchange connection info via QR. Currently, sync works over LAN or if both devices connect to the same Gun peer relay.
+4. **QR scanning** — The `CameraView` from `expo-camera` is used in `sync.tsx` Join tab. On first use, the app requests camera permission. Scanner decodes `gun://<relay>/trips/<tripId>` format and auto-connects to the relay.
+5. **Gun.js peer discovery** — Connected peers are tracked via `gun.on('hi'/'bye')` events. The `connectedPeers` array in peerStore is updated in real-time. For internet-based sync, both devices must connect to the same Gun relay.
 6. **No input validation on amounts** — The app trusts user input for amounts. Consider adding max-value guards.
 7. **Dark mode** — System dark/light mode is fully supported via the theme provider. The app auto-detects the system appearance.
 
@@ -283,13 +312,12 @@ npx expo export --platform web      # Web bundle
 
 1. **QR scanning** — Complete the camera import flow in `sync.tsx`
 2. **Edit/delete expenses** — Edit endpoint exists in `expenseStore.ts`, needs UI in `ExpenseCard.tsx`
-3. **Edit/delete expenses** — Edit endpoint exists in `expenseStore.ts`, needs UI in `ExpenseCard.tsx`
-4. **Receipt image attachment** — Use `expo-image-picker` to attach receipt photos
-5. **Multi-currency conversion** — Exchange rates API for trips with mixed currencies
-7. **Push notifications** — When a peer adds an expense, notify others
-8. **Gun.js relay peer** — Option to connect to a public Gun relay for internet-based sync without QR
-9. **Testing** — Add Jest/React Native Testing Library tests for balance/split logic
-10. **EAS Build** — Configure eas.json for production builds to App Store / Play Store
+3. **Receipt image attachment** — Use `expo-image-picker` to attach receipt photos
+4. **Multi-currency conversion** — Exchange rates API for trips with mixed currencies
+5. **Push notifications** — When a peer adds an expense, notify others
+6. **Gun.js relay peer** — Option to connect to a public Gun relay for internet-based sync without QR
+7. **Testing** — Add Jest/React Native Testing Library tests for balance/split logic
+8. **EAS Build** — Configure eas.json for production builds to App Store / Play Store
 
 ---
 

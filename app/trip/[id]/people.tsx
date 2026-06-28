@@ -12,6 +12,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useExpenseStore } from '../../../src/stores/expenseStore'
 import { useTripStore } from '../../../src/stores/tripStore'
+import { usePeerStore } from '../../../src/stores/peerStore'
 import { useThemeColors, spacing, borderRadius, typography } from '../../../src/theme'
 
 export default function PeopleScreen() {
@@ -21,6 +22,7 @@ export default function PeopleScreen() {
   const colors = useThemeColors()
 
   const trip = useTripStore(s => s.trips.find(t => t.id === id))
+  const deviceId = usePeerStore(s => s.deviceId)
   const { participantsByTrip, addParticipant, removeParticipant } = useExpenseStore()
   const participants = participantsByTrip[id!] || []
 
@@ -33,7 +35,7 @@ export default function PeopleScreen() {
       Alert.alert('Duplicate', 'A participant with that name already exists')
       return
     }
-    addParticipant(id!, trimmed)
+    addParticipant(id!, trimmed, deviceId)
     setNewName('')
   }
 

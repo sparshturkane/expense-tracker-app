@@ -6,6 +6,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "buffer": "^6.0.3",
     "expo": "~56.0.12",
+    "expo-camera": "~56.0.8",
     "expo-file-system": "~56.0.8",
     "expo-router": "~56.2.11",
     "expo-sharing": "~56.0.18",
@@ -34,7 +35,8 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "relay": "node server/relay.js"
   },
   "private": true
 }

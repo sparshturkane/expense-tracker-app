@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { View, Text, ActivityIndicator } from 'react-native'
-import { getGun, initDeviceId } from '../src/gun/setup'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { getGun, initDeviceId, initRelay, initPeerTracking } from '../src/gun/setup'
 import { usePeerStore } from '../src/stores/peerStore'
 import { useTripStore } from '../src/stores/tripStore'
+import InAppNotification from '../src/components/InAppNotification'
 import { ThemeProvider, useThemeColors, useTheme } from '../src/theme'
 
 function AppContent({ children }: { children: React.ReactNode }) {
@@ -30,6 +32,8 @@ export default function RootLayout() {
         getGun()
         const id = await initDeviceId()
         setDeviceId(id)
+        await initRelay()
+        initPeerTracking()
         loadTrips()
       } catch (e) {
         console.warn('Init error:', e)
@@ -48,19 +52,22 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider>
-      <AppContent>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="trip/new" />
-          <Stack.Screen name="trip/[id]/index" />
-          <Stack.Screen name="trip/[id]/expense/add" />
-          <Stack.Screen name="trip/[id]/people" />
-          <Stack.Screen name="trip/[id]/settle" />
-          <Stack.Screen name="trip/[id]/sync" />
-        </Stack>
-      </AppContent>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <AppContent>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="trip/new" />
+            <Stack.Screen name="trip/[id]/index" />
+            <Stack.Screen name="trip/[id]/expense/add" />
+            <Stack.Screen name="trip/[id]/people" />
+            <Stack.Screen name="trip/[id]/settle" />
+            <Stack.Screen name="trip/[id]/sync" />
+          </Stack>
+          <InAppNotification />
+        </AppContent>
+      </ThemeProvider>
+    </SafeAreaProvider>
   )
 }
 

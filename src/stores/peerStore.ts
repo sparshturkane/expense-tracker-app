@@ -6,6 +6,8 @@ interface PeerStore {
   connectedPeers: string[]
   addPeer: (peerId: string) => void
   removePeer: (peerId: string) => void
+  relayUrl: string
+  setRelayUrl: (url: string) => void
 }
 
 export const usePeerStore = create<PeerStore>(set => ({
@@ -22,4 +24,6 @@ export const usePeerStore = create<PeerStore>(set => ({
     set(state => ({
       connectedPeers: state.connectedPeers.filter(p => p !== peerId),
     })),
+  relayUrl: '',
+  setRelayUrl: (url: string) => set({ relayUrl: url }),
 }))

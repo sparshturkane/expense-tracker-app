@@ -4,6 +4,7 @@ export interface Participant {
   id: string
   name: string
   createdAt: string
+  addedByDevice?: string
 }
 
 export interface SplitDetail {

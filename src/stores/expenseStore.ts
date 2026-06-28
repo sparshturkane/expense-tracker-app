@@ -3,13 +3,20 @@ import { Expense, Participant, Settlement, SplitDetail, SplitType } from '../typ
 import { getGun } from '../gun/setup'
 import { v4 as uuid } from 'uuid'
 import { calculateSplit } from '../utils/split'
+import { useNotificationStore } from './notificationStore'
+import { usePeerStore } from './peerStore'
+
+// Module-level tracking for remote change detection
+const knownExpenseIds = new Map<string, Set<string>>()
+const knownParticipantIds = new Map<string, Set<string>>()
+const initialLoadComplete = new Map<string, boolean>()
 
 interface ExpenseStore {
   expensesByTrip: Record<string, Expense[]>
   participantsByTrip: Record<string, Participant[]>
   settlementsByTrip: Record<string, Settlement[]>
   loadTripData: (tripId: string) => void
-  addParticipant: (tripId: string, name: string) => Participant
+  addParticipant: (tripId: string, name: string, deviceId?: string) => Participant
   removeParticipant: (tripId: string, participantId: string) => void
   addExpense: (
     tripId: string,
@@ -36,9 +43,17 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
   loadTripData: (tripId: string) => {
     const gun = getGun()
     const tripNode = gun.get('trips').get(tripId)
+    const deviceId = usePeerStore.getState().deviceId
+
+    if (!knownExpenseIds.has(tripId)) knownExpenseIds.set(tripId, new Set())
+    if (!knownParticipantIds.has(tripId)) knownParticipantIds.set(tripId, new Set())
+    if (!initialLoadComplete.has(tripId)) initialLoadComplete.set(tripId, false)
 
     tripNode.get('participants').map().on((data: any, key: string) => {
       if (data && data.name) {
+        const isNew = !knownParticipantIds.get(tripId)!.has(key)
+        knownParticipantIds.get(tripId)!.add(key)
+
         set(state => ({
           participantsByTrip: {
             ...state.participantsByTrip,
@@ -48,11 +63,22 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
             ],
           },
         }))
+
+        if (initialLoadComplete.get(tripId) && isNew && data.addedByDevice && data.addedByDevice !== deviceId) {
+          useNotificationStore.getState().show({
+            id: `participant-${key}`,
+            message: `${data.name} joined the trip`,
+            type: 'participant_joined',
+          })
+        }
       }
     })
 
     tripNode.get('expenses').map().on((data: any, key: string) => {
       if (data && data.description) {
+        const isNew = !knownExpenseIds.get(tripId)!.has(key)
+        knownExpenseIds.get(tripId)!.add(key)
+
         set(state => ({
           expensesByTrip: {
             ...state.expensesByTrip,
@@ -62,6 +88,16 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
             ],
           },
         }))
+
+        if (initialLoadComplete.get(tripId) && isNew && data.addedByDevice && data.addedByDevice !== deviceId) {
+          const participants = get().participantsByTrip[tripId] || []
+          const payerName = participants.find(p => p.id === data.paidBy)?.name || 'Someone'
+          useNotificationStore.getState().show({
+            id: `expense-${key}`,
+            message: `${payerName} added ${data.description} (${data.amount})`,
+            type: 'expense_added',
+          })
+        }
       }
     })
 
@@ -78,11 +114,15 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
         }))
       }
     })
+
+    setTimeout(() => {
+      initialLoadComplete.set(tripId, true)
+    }, 2000)
   },
 
-  addParticipant: (tripId: string, name: string) => {
+  addParticipant: (tripId: string, name: string, deviceId?: string) => {
     const id = uuid()
-    const participant: Participant = { id, name, createdAt: new Date().toISOString() }
+    const participant: Participant = { id, name, createdAt: new Date().toISOString(), addedByDevice: deviceId || '' }
     getGun().get('trips').get(tripId).get('participants').get(id).put(participant)
     getGun().get('trips').get(tripId).get('updatedAt').put(new Date().toISOString())
 
